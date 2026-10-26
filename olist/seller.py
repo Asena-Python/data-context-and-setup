@@ -139,34 +139,71 @@ class Seller:
     def get_review_score(self):
         """
         Returns a DataFrame with:
-        'seller_id', 'share_of_five_stars', 'share_of_one_stars', 'review_score'
+        'seller_id', 'share_of_five_stars',
+        'share_of_one_stars', 'review_score'
         """
+        from olist.data import Olist
 
-        pass  # YOUR CODE HERE
+        data = Olist().get_data()
+
+        reviews = data['order_reviews']
+        items = data['order_items']
+
+        seller_orders = items[
+            ['seller_id', 'order_id']
+        ].drop_duplicates()
+
+        merged = seller_orders.merge(
+            reviews[['order_id', 'review_score']],
+            on='order_id',
+            how='inner'
+        )
+
+        result = merged.groupby('seller_id').agg(
+            share_of_five_stars=(
+                'review_score',
+                lambda x: (x == 5).mean()
+            ),
+            share_of_one_stars=(
+                'review_score',
+                lambda x: (x == 1).mean()
+            ),
+            review_score=('review_score', 'mean')
+        ).reset_index()
+
+        return result
 
     def get_training_data(self):
         """
-        Returns a DataFrame with:
-        ['seller_id', 'seller_city', 'seller_state', 'delay_to_carrier',
-        'wait_time', 'date_first_sale', 'date_last_sale', 'months_on_olist', 'share_of_one_stars',
-        'share_of_five_stars', 'review_score', 'n_orders', 'quantity',
-        'quantity_per_order', 'sales']
+        Returns a DataFrame with seller performance features.
         """
 
-        training_set =\
-            self.get_seller_features()\
-                .merge(
-                self.get_seller_delay_wait_time(), on='seller_id'
-               ).merge(
-                self.get_active_dates(), on='seller_id'
-               ).merge(
-                self.get_quantity(), on='seller_id'
-               ).merge(
-                self.get_sales(), on='seller_id'
-               )
+        training_set = (
+            self.get_seller_features()
+            .merge(
+                self.get_seller_delay_wait_time(),
+                on='seller_id'
+            )
+            .merge(
+                self.get_active_dates(),
+                on='seller_id'
+            )
+            .merge(
+                self.get_quantity(),
+                on='seller_id'
+            )
+            .merge(
+                self.get_sales(),
+                on='seller_id'
+            )
+        )
 
-        if self.get_review_score() is not None:
-            training_set = training_set.merge(self.get_review_score(),
-                                              on='seller_id')
+        review_data = self.get_review_score()
+
+        if review_data is not None:
+            training_set = training_set.merge(
+                review_data,
+                on='seller_id'
+            )
 
         return training_set
