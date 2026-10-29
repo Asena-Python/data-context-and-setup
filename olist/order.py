@@ -132,93 +132,93 @@ class Order:
         return price_freight_df
 
     # Optional
-def get_distance_seller_customer(self):
-    """
-    Returns a DataFrame with:
-    order_id, distance_seller_customer
-    """
+    def get_distance_seller_customer(self):
+                    """
+                    Returns a DataFrame with:
+                    order_id, distance_seller_customer
+                    """
 
-    orders = self.data['orders']
-    order_items = self.data['order_items']
-    sellers = self.data['sellers']
-    customers = self.data['customers']
-    geolocation = self.data['geolocation']
+                    orders = self.data['orders']
+                    order_items = self.data['order_items']
+                    sellers = self.data['sellers']
+                    customers = self.data['customers']
+                    geolocation = self.data['geolocation']
 
-    matching_geo = orders.merge(
-        customers,
-        on='customer_id',
-        how='left'
-    )
+                    matching_geo = orders.merge(
+                        customers,
+                        on='customer_id',
+                        how='left'
+                    )
 
-    matching_geo = matching_geo.merge(
-        order_items[['order_id', 'seller_id']],
-        on='order_id',
-        how='left'
-    )
+                    matching_geo = matching_geo.merge(
+                        order_items[['order_id', 'seller_id']],
+                        on='order_id',
+                        how='left'
+                    )
 
-    matching_geo = matching_geo.merge(
-        sellers,
-        on='seller_id',
-        how='left'
-    )
+                    matching_geo = matching_geo.merge(
+                        sellers,
+                        on='seller_id',
+                        how='left'
+                    )
 
-    geo_avg = (
-        geolocation.groupby('geolocation_zip_code_prefix')[
-            ['geolocation_lat', 'geolocation_lng']
-        ]
-        .mean()
-        .reset_index()
-    )
+                    geo_avg = (
+                        geolocation.groupby('geolocation_zip_code_prefix')[
+                            ['geolocation_lat', 'geolocation_lng']
+                        ]
+                        .mean()
+                        .reset_index()
+                    )
 
-    matching_geo = matching_geo.merge(
-        geo_avg,
-        left_on='customer_zip_code_prefix',
-        right_on='geolocation_zip_code_prefix',
-        how='left'
-    )
+                    matching_geo = matching_geo.merge(
+                        geo_avg,
+                        left_on='customer_zip_code_prefix',
+                        right_on='geolocation_zip_code_prefix',
+                        how='left'
+                    )
 
-    matching_geo = matching_geo.rename(columns={
-        'geolocation_lat': 'customer_lat',
-        'geolocation_lng': 'customer_lng'
-    })
+                    matching_geo = matching_geo.rename(columns={
+                        'geolocation_lat': 'customer_lat',
+                        'geolocation_lng': 'customer_lng'
+                    })
 
-    matching_geo = matching_geo.merge(
-        geo_avg,
-        left_on='seller_zip_code_prefix',
-        right_on='geolocation_zip_code_prefix',
-        how='left',
-        suffixes=('', '_seller')
-    )
+                    matching_geo = matching_geo.merge(
+                        geo_avg,
+                        left_on='seller_zip_code_prefix',
+                        right_on='geolocation_zip_code_prefix',
+                        how='left',
+                        suffixes=('', '_seller')
+                    )
 
-    matching_geo = matching_geo.rename(columns={
-        'geolocation_lat': 'seller_lat',
-        'geolocation_lng': 'seller_lng'
-    })
-    import numpy as np
+                    matching_geo = matching_geo.rename(columns={
+                        'geolocation_lat': 'seller_lat',
+                        'geolocation_lng': 'seller_lng'
+                    })
+                    import numpy as np
 
-    lat1 = np.radians(matching_geo['customer_lat'])
-    lon1 = np.radians(matching_geo['customer_lng'])
-    lat2 = np.radians(matching_geo['seller_lat'])
-    lon2 = np.radians(matching_geo['seller_lng'])
+                    lat1 = np.radians(matching_geo['customer_lat'])
+                    lon1 = np.radians(matching_geo['customer_lng'])
+                    lat2 = np.radians(matching_geo['seller_lat'])
+                    lon2 = np.radians(matching_geo['seller_lng'])
 
-    dlat = lat2 - lat1
-    dlon = lon2 - lon1
+                    dlat = lat2 - lat1
+                    dlon = lon2 - lon1
 
-    a = (
-        np.sin(dlat / 2) ** 2
-        + np.cos(lat1) * np.cos(lat2) * np.sin(dlon / 2) ** 2
-    )
+                    a = (
+                        np.sin(dlat / 2) ** 2
+                        + np.cos(lat1) * np.cos(lat2) * np.sin(dlon / 2) ** 2
+                    )
 
-    matching_geo['distance_seller_customer'] = (
-        6371 * 2 * np.arcsin(np.sqrt(a.clip(0, 1)))
-    )
-    matching_geo = (
-        matching_geo.groupby('order_id', as_index=False)
-        ['distance_seller_customer']
-        .mean()
-    )
+                    matching_geo['distance_seller_customer'] = (
+                        6371 * 2 * np.arcsin(np.sqrt(a.clip(0, 1)))
+                    )
+                    matching_geo = (
+                        matching_geo.groupby('order_id', as_index=False)
+                        ['distance_seller_customer']
+                        .mean()
+                    )
 
-    return matching_geo
+                    return matching_geo
 
     def get_training_data(
         self,
