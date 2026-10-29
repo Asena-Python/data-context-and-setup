@@ -137,41 +137,58 @@ class Seller:
             .rename(columns={'price': 'sales'})
 
     def get_review_score(self):
-        """
-        Returns a DataFrame with:
-        'seller_id', 'share_of_five_stars',
-        'share_of_one_stars', 'review_score'
-        """
-        from olist.data import Olist
-
-        data = Olist().get_data()
-
-        reviews = data['order_reviews']
-        items = data['order_items']
-
-        seller_orders = items[
-            ['seller_id', 'order_id']
-        ].drop_duplicates()
-
-        merged = seller_orders.merge(
-            reviews[['order_id', 'review_score']],
-            on='order_id',
-            how='inner'
-        )
-
-        result = merged.groupby('seller_id').agg(
-            share_of_five_stars=(
-                'review_score',
-                lambda x: (x == 5).mean()
-            ),
-            share_of_one_stars=(
-                'review_score',
-                lambda x: (x == 1).mean()
-            ),
-            review_score=('review_score', 'mean')
-        ).reset_index()
-
-        return result
+            """
+            Returns seller review statistics and review costs.
+            """
+            from olist.data import Olist
+    
+            data = Olist().get_data()
+    
+            reviews = data['order_reviews']
+            items = data['order_items']
+    
+            seller_orders = items[
+                ['seller_id', 'order_id']
+            ].drop_duplicates()
+    
+            merged = seller_orders.merge(
+                reviews[['order_id', 'review_score']],
+                on='order_id',
+                how='inner'
+            )
+    
+            review_costs = {
+                1: 100,
+                2: 50,
+                3: 40,
+                4: 0,
+                5: 0
+            }
+    
+            merged['review_cost'] = (
+                merged['review_score'].map(review_costs)
+            )
+    
+            result = merged.groupby('seller_id').agg(
+                share_of_five_stars=(
+                    'review_score',
+                    lambda x: (x == 5).mean()
+                ),
+                share_of_one_stars=(
+                    'review_score',
+                    lambda x: (x == 1).mean()
+                ),
+                review_score=(
+                    'review_score',
+                    'mean'
+                ),
+                cost_of_reviews=(
+                    'review_cost',
+                    'sum'
+                )
+            ).reset_index()
+    
+            return result
 
     def get_training_data(self):
         """
@@ -200,10 +217,24 @@ class Seller:
 
         review_data = self.get_review_score()
 
-        if review_data is not None:
-            training_set = training_set.merge(
-                review_data,
-                on='seller_id'
-            )
+        training_set = training_set.merge(
+            review_data,
+            on='seller_id',
+            how='left'
+        )
+
+        training_set['revenues'] = (
+            0.10 * training_set['sales']
+            + 80 * training_set['months_on_olist']
+        )
+
+        training_set['cost_of_reviews'] = (
+            training_set['cost_of_reviews'].fillna(0)
+        )
+
+        training_set['profits'] = (
+            training_set['revenues']
+            - training_set['cost_of_reviews']
+        )
 
         return training_set
